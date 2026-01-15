@@ -76,57 +76,55 @@ pipeline {
          * 1. EC2에 접속하여 git + docker-compose 배포
          ***********************/
         stage('EC2 배포') {
-        steps {
-        sshagent([env.EC2_SSH_CREDENTIALS]) {
-           sh """
-                ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_HOST} '
-                    set -e
+            steps {
+                sshagent([env.EC2_SSH_CREDENTIALS]) {
+                    sh """
+                    ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_HOST} '
+                        set -e
+                        echo "[EC2] 배포 디렉토리: ${EC2_APP_DIR}"
+                        rm -rf "${EC2_APP_DIR}"
+                        mkdir -p "${EC2_APP_DIR}"
+                        cd "${EC2_APP_DIR}"
 
-                    echo "[EC2] 배포 디렉토리: ${EC2_APP_DIR}"
-                    rm -rf "${EC2_APP_DIR}"
-                    mkdir -p "${EC2_APP_DIR}"
-                    cd "${EC2_APP_DIR}"
+                        echo "[EC2] Git clone: ${GITHUB_SCRIPT_URL}"
+                        git clone ${GITHUB_SCRIPT_URL} .
 
-                    echo "[EC2] Git clone: ${GITHUB_SCRIPT_URL}"
-                    git clone ${GITHUB_SCRIPT_URL} .
+                        echo "[EC2] 현재 디렉토리:"
+                        pwd
 
-                    echo "[EC2] 현재 디렉토리:"
-                    pwd
+                        echo "[EC2] 디렉토리 파일 목록:"
+                        ls -al
 
-                    echo "[EC2] 디렉토리 파일 목록:"
-                    ls -al
+                        echo "[EC2] docker-compose pull (이미지 갱신)"
+                        docker compose -f ${DOCKER_COMPOSE_FILE} pull || true
+                        
+                        echo "[EC2] 기존 컨테이너 down"
+                        docker compose -f ${DOCKER_COMPOSE_FILE} down || true
 
-                    echo "[EC2] docker-compose pull (이미지 갱신)"
-                    docker compose -f ${DOCKER_COMPOSE_FILE} pull || true
-                    
-                    echo "[EC2] 기존 컨테이너 down"
-                    docker compose -f ${DOCKER_COMPOSE_FILE} down || true
+                    echo "[EC2] 기존 이미지 삭제 (compose에서 사용하는 이미지만)"
+                        IMAGES=\$(docker compose -f ${DOCKER_COMPOSE_FILE} images -q || true)
+                        if [ -n "\$IMAGES" ]; then
+                            echo "[EC2] 삭제할 이미지: \$IMAGES"
+                            docker rmi \$IMAGES || true
+                        else
+                            echo "[EC2] 삭제할 이미지 없음"
+                        fi
 
-                   echo "[EC2] 기존 이미지 삭제 (compose에서 사용하는 이미지만)"
-                    IMAGES=\$(docker compose -f ${DOCKER_COMPOSE_FILE} images -q || true)
-                    if [ -n "\$IMAGES" ]; then
-                        echo "[EC2] 삭제할 이미지: \$IMAGES"
-                        docker rmi \$IMAGES || true
-                    else
-                        echo "[EC2] 삭제할 이미지 없음"
-                    fi
+                        echo "[EC2] Dangling 이미지 정리"
+                        docker image prune -f || true
 
-                    echo "[EC2] Dangling 이미지 정리"
-                    docker image prune -f || true
+                        echo "[EC2] 새로운 컨테이너 up -d"
+                        docker compose -f ${DOCKER_COMPOSE_FILE} up -d
 
-                    echo "[EC2] 새로운 컨테이너 up -d"
-                    docker compose -f ${DOCKER_COMPOSE_FILE} up -d
-
-                    echo "[EC2] 컨테이너 상태 확인"
-                    docker compose -f ${DOCKER_COMPOSE_FILE} ps
-                '
-            """
+                        echo "[EC2] 컨테이너 상태 확인"
+                        docker compose -f ${DOCKER_COMPOSE_FILE} ps
+                    '
+                """
+                }
+            }
         }
     }
-}
-
-    }
-  
+    /*
     post {
         success {
             echo "✅ EC2 배포 성공!"
@@ -135,4 +133,5 @@ pipeline {
             echo "❌ EC2 배포 실패. 콘솔 로그를 확인하세요."
         }
     }
+    */
 }
