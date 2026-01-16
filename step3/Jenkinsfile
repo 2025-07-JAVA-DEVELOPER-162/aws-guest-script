@@ -58,9 +58,6 @@ pipeline {
                         # 특정 브랜치를 sparse-checkout
                         git pull origin main
 
-
-
-
                         echo "[EC2] 현재 디렉토리:"
                         pwd
 
