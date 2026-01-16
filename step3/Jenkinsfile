@@ -53,7 +53,7 @@ pipeline {
                         # sparse checkout 활성화
                         git config core.sparseCheckout true
                         # 체크아웃할 경로 지정 (예: ${STEP_NUM}/build 디렉토리만)
-                        echo " ${STEP_NUM}/build/" >> .git/info/sparse-checkout
+                        echo "${STEP_NUM}/build/" >> .git/info/sparse-checkout
                         # 특정 브랜치를 sparse-checkout
                         git pull origin main
 
