@@ -15,13 +15,13 @@ pipeline {
     environment {
        // ===== Git Repositories =====
         GITHUB_SCRIPT_URL = "https://github.com/${GITHUB_USERNAME}/aws-guest-script.git"
-        GITHUB_SOURCE_URL = "https://github.com/${GITHUB_USERNAME}/aws-guest-source.git"
         
        // ===== EC2 =====
         EC2_USER='ubuntu'
-        EC2_HOST='43.201.114.152'
+        EC2_HOST='15.164.228.132'
         EC2_APP_DIR='/home/ubuntu/aws-guest-script'
-        DOCKER_COMPOSE_FILE='./deploy/docker-compose-guest-mysql-image.yml'
+        STEP_NUM='step4'
+        DOCKER_COMPOSE_FILE='docker-compose-guest-mysql-image.yml'
         //DOCKER_COMPOSE_FILE='docker-compose-guest-mysql.yml'
         // Jenkins → Credentials → SSH Username with private key
         EC2_SSH_CREDENTIALS   = 'deploy-ssh-key'
@@ -29,49 +29,6 @@ pipeline {
         DOCKERHUB_CREDENTIALS = 'dockerhub-credentials'
     }
     stages {
-        /***********************
-         * 1. 소스 체크아웃 & Gradle 빌드
-         ***********************/
-        stage('Source Build') {
-            steps {
-                git branch: 'main',
-                url: "${GITHUB_SOURCE_URL}"
-                sh "chmod +x ./gradlew"
-                sh "./gradlew clean build"
-            }
-        }
-        /***********************
-         * 2.  Docker 이미지 빌드 & DockerHub 푸시
-         ***********************/
-        stage('Docker File Checkout Docker Build & Push') {
-            steps {
-               echo "==== Git Checkout 시작 ===="
-               checkout([
-                    $class: 'GitSCM',
-                    branches: [[name: "*/main"]],
-                    userRemoteConfigs: [[
-                        url: "${GITHUB_SCRIPT_URL}"
-                    ]]
-               ])
-                echo "==== Git Checkout 완료 ===="
-                withCredentials([usernamePassword(
-                    credentialsId: env.DOCKERHUB_CREDENTIALS,
-                    usernameVariable: 'DOCKERHUB_USER',
-                    passwordVariable: 'DOCKERHUB_PASS'
-                )]) 
-                {
-                sh '''
-                    echo "jar 파일 복사"
-                    cp ./build/libs/app.jar ./docker/app.jar
-                    docker build  -t "${DOCKERHUB_USER}/guest" ./docker
-                    echo "${DOCKERHUB_PASS}" | docker login -u "${DOCKERHUB_USER}" --password-stdin
-                    docker push "${DOCKERHUB_USER}/guest"
-                    docker logout
-                '''
-                }
-            }
-        }
-
         /***********************
          * 1. EC2에 접속하여 git + docker-compose 배포
          ***********************/
@@ -82,12 +39,22 @@ pipeline {
                     ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_HOST} '
                         set -e
                         echo "[EC2] 배포 디렉토리: ${EC2_APP_DIR}"
+                        
                         rm -rf "${EC2_APP_DIR}"
                         mkdir -p "${EC2_APP_DIR}"
                         cd "${EC2_APP_DIR}"
 
-                        echo "[EC2] Git clone: ${GITHUB_SCRIPT_URL}"
-                        git clone ${GITHUB_SCRIPT_URL} .
+                        echo "[EC2] Git sparse checkout: ${GITHUB_SCRIPT_URL}"
+                        # Git 초기화
+                        git init
+                        # 원격 저장소 연결
+                        git remote add origin ${GITHUB_SCRIPT_URL}
+                        # sparse checkout 활성화
+                        git config core.sparseCheckout true
+                        # 체크아웃할 경로 지정 (예: ${STEP_NUM}/deploy/ 디렉토리만)
+                        echo "${STEP_NUM}/deploy/" >> .git/info/sparse-checkout
+                        # 특정 브랜치를 sparse-checkout
+                        git pull origin main
 
                         echo "[EC2] 현재 디렉토리:"
                         pwd
@@ -96,13 +63,13 @@ pipeline {
                         ls -al
 
                         echo "[EC2] docker-compose pull (이미지 갱신)"
-                        docker compose -f ${DOCKER_COMPOSE_FILE} pull || true
+                        docker compose -f ./${STEP_NUM}/deploy/${DOCKER_COMPOSE_FILE} pull || true
                         
                         echo "[EC2] 기존 컨테이너 down"
-                        docker compose -f ${DOCKER_COMPOSE_FILE} down || true
+                        docker compose -f ./${STEP_NUM}/deploy/${DOCKER_COMPOSE_FILE} down || true
 
                         echo "[EC2] 기존 이미지 삭제 (compose에서 사용하는 이미지만)"
-                        IMAGES=\$(docker compose -f ${DOCKER_COMPOSE_FILE} images -q || true)
+                        IMAGES=\$(docker compose -f ./${STEP_NUM}/deploy/${DOCKER_COMPOSE_FILE} images -q || true)
                         if [ -n "\$IMAGES" ]; then
                             echo "[EC2] 삭제할 이미지: \$IMAGES"
                             docker rmi \$IMAGES || true
@@ -114,10 +81,10 @@ pipeline {
                         docker image prune -f || true
 
                         echo "[EC2] 새로운 컨테이너 up -d"
-                        docker compose -f ${DOCKER_COMPOSE_FILE} up -d
+                        docker compose -f ./${STEP_NUM}/deploy/${DOCKER_COMPOSE_FILE} up -d
 
                         echo "[EC2] 컨테이너 상태 확인"
-                        docker compose -f ${DOCKER_COMPOSE_FILE} ps
+                        docker compose -f ./${STEP_NUM}/deploy/${DOCKER_COMPOSE_FILE} ps
                     '
                 """
                 }
