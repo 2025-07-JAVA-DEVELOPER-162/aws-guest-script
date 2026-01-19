@@ -2,9 +2,9 @@
 FROM gradle:8.5.0-jdk21 AS build
 WORKDIR /app
 
-COPY guest_backend/gradle gradle
-COPY guest_backend/gradlew .
-COPY guest_backend/build.gradle* guest_backend/settings.gradle* guest_backend/gradle.properties* ./
+COPY gradle gradle
+COPY gradlew .
+COPY build.gradle* settings.gradle* gradle.properties* ./
 RUN chmod +x ./gradlew
 
 COPY guest_backend/src src
