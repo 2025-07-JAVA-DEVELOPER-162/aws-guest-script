@@ -35,31 +35,7 @@ pipeline {
         /***********************
          * 1. 소스 체크아웃 & Gradle 빌드
          ***********************/
-      
-        
-        // stage('Source Build[/guest-frontend]') {
-        //     steps {
-        //        checkout([
-        //             $class: 'GitSCM',
-        //             branches: [[name: '*/main']],
-        //             userRemoteConfigs: [[
-        //                 url: "${GITHUB_SOURCE_URL}",
-        //                 credentialsId: env.GITHUB_CREDENTIALS
-        //             ]],
-        //             extensions: [
-        //                 [$class: 'SparseCheckoutPaths', sparseCheckoutPaths: [
-        //                     [path: 'guest_frontend/']
-        //                 ]]
-        //             ]
-        //         ])
-            
-        //     }
-        // }
-        
-        /***********************
-         * 2.  Docker 이미지 빌드 & DockerHub 푸시
-         ***********************/
-        stage('Docker File Checkout Docker Build & Push') {
+          stage('Docker File Checkout Docker Build & Push') {
            steps {
             echo "==== Source Checkout (guest_backend) 시작 ===="
             checkout([
@@ -77,7 +53,10 @@ pipeline {
             ])
              echo "==== Source Checkout 완료 ===="
            }
-           
+        /***********************
+         * 2.  Docker 이미지 빌드 & DockerHub 푸시
+         ***********************/
+        stage('Docker File Checkout Docker Build & Push') {
             steps {
                echo "==== Git Checkout 시작 ===="
                checkout scmGit(
