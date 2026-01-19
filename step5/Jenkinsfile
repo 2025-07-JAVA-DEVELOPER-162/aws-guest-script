@@ -39,6 +39,7 @@ pipeline {
             steps {
                 git branch: 'main',
                 url: "${GITHUB_SOURCE_URL}"
+                credentialsId: env.GITHUB_CREDENTIALS   // ✅ GitHub 크리덴셜 ID
             }
         }
         
