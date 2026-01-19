@@ -37,8 +37,9 @@ pipeline {
             steps {
                 git branch: 'main',
                 url: "${GITHUB_SOURCE_URL}"
-                sh "chmod +x ./gradlew"
-                sh "./gradlew clean build"
+                credentialsId: env.GITHUB_CREDENTIALS   // ✅ GitHub 크리덴셜 ID
+                //sh "chmod +x ./gradlew"
+                //sh "./gradlew clean build"
             }
         }
         /***********************
